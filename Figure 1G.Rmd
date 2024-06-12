@@ -1,0 +1,152 @@
+---
+title: "GARP analysis on glioblastoma (GBM)"
+date: "`r Sys.Date()`"
+author: Yuzhou Chang
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+
+library(rmarkdown)
+```{r setup, include=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggpubr)
+library(survival)
+library(lubridate)
+library(gtsummary)
+library(tidycmprsk)
+library(survminer)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+```
+
+# Data Overview
+The Data (TCGA_cell_2013) have 152 patients and the expression data was downloaded from [cBioPortal](!https://www.cbioportal.org/datasets) and the original paper is [here](!https://pubmed.ncbi.nlm.nih.gov/24120142/)
+
+## TCGA_cell_2013 information
+
+This data contains 152 patients, including 39 classical, 49 Mesenchymal, 26 Neural, 29 Proneural, and 9 others ( G-CIMP). As you care about four subtypes, I exclude other categories and only keep 143 patients with four subtype categories. 
+
+```{r,echo = F}
+load("/bmbl_data/yuzhou/collaborative/Li_lab/Dan/analysis/TCGA_cell_2013_meta.Rdata")
+TCGA_cell_2013_meta$censor <- ifelse(TCGA_cell_2013_meta$OS_STATUS == "1:DECEASED",1,0)
+# new.meta <- new.meta[new.meta$survival_time != "NA",]
+TCGA_cell_2013_meta[,c(2,3)] %>% tbl_summary()
+TCGA_cell_2013_meta <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$tutmor_type != "G-CIMP" & !is.na(TCGA_cell_2013_meta$tutmor_type),]
+
+```
+
+
+# Effect of higher GARP expression (i.e. top 10% vs bottom 10%) on survival of GBM patients.
+## TCGA_cell_2013 survival analysis for all tumor subtypes
+```{r, echo = F}
+TCGA_cell_2013_meta$GARP_binary <- "no_group"
+TCGA_cell_2013_meta$GARP_binary <- ifelse(TCGA_cell_2013_meta$GARP_expression > quantile(TCGA_cell_2013_meta$GARP_expression,0.9,na.rm = T ),"high_expression",TCGA_cell_2013_meta$GARP_binary)
+TCGA_cell_2013_meta$GARP_binary <- ifelse(TCGA_cell_2013_meta$GARP_expression < quantile(TCGA_cell_2013_meta$GARP_expression,0.1,na.rm = T),"low_expression",TCGA_cell_2013_meta$GARP_binary)
+# table(TCGA_cell_2013_meta$GARP_binary )
+sub.meta.GARP <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$GARP_binary!="no_group",]
+sub.meta.GARP$OS_time <- as.numeric(sub.meta.GARP$OS_time)
+km_trt_fit <- survfit(Surv(OS_time, censor) ~ GARP_binary, data=sub.meta.GARP)
+ggsurvplot(km_trt_fit,pval = T)
+
+```
+
+## TCGA_cell_2013 survival analysis for four tumor subtypes 
+
+### Survival analysis for classical
+```{r, echo =F}
+TCGA_cell_2013_meta_Classical <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$tutmor_type == "Classical",]
+sub.meta_Classical.GARP <- TCGA_cell_2013_meta_Classical[TCGA_cell_2013_meta_Classical$GARP_binary!="no_group",]
+sub.meta_Classical.GARP$OS_time <- as.numeric(sub.meta_Classical.GARP$OS_time)
+km_trt_fit <- survfit(Surv(OS_time, censor) ~ GARP_binary, data=sub.meta_Classical.GARP)
+ggsurvplot(km_trt_fit,pval = T) + labs(title = "classical") 
+```
+
+### Survival analysis for mesenchymal  
+```{r, echo = F}
+TCGA_cell_2013_meta_Mesenchymal <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$tutmor_type == "Mesenchymal",]
+sub.meta_Mesenchymal.GARP <- TCGA_cell_2013_meta_Mesenchymal[TCGA_cell_2013_meta_Mesenchymal$GARP_binary!="no_group",]
+sub.meta_Mesenchymal.GARP$OS_time <- as.numeric(sub.meta_Mesenchymal.GARP$OS_time)
+km_trt_fit <- survfit(Surv(OS_time, censor) ~ GARP_binary, data=sub.meta_Mesenchymal.GARP)
+ggsurvplot(km_trt_fit,pval = T,palette = c("#ff8080", "#5757f9"), ggtheme = theme_classic())+ labs(title = "Mesenchymal")
+```
+
+### Survival analysis for  neural  
+```{r, echo = F}
+TCGA_cell_2013_meta_Neural <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$tutmor_type == "Neural",]
+sub.meta_Neural.GARP <- TCGA_cell_2013_meta_Neural[TCGA_cell_2013_meta_Neural$GARP_binary!="no_group",]
+sub.meta_Neural.GARP$OS_time <- as.numeric(sub.meta_Neural.GARP$OS_time)
+km_trt_fit <- survfit(Surv(OS_time, censor) ~ GARP_binary, data=sub.meta_Neural.GARP)
+ggsurvplot(km_trt_fit,pval = T)+ labs(title = "Neural") 
+```
+
+### Survival analysis proneural  
+```{r, echo = F}
+TCGA_cell_2013_meta_Proneural <- TCGA_cell_2013_meta[TCGA_cell_2013_meta$tutmor_type == "Proneural",]
+sub.meta_Proneural.GARP <- TCGA_cell_2013_meta_Proneural[TCGA_cell_2013_meta_Proneural$GARP_binary!="no_group",]
+sub.meta_Proneural.GARP$OS_time <- as.numeric(sub.meta_Proneural.GARP$OS_time)
+km_trt_fit <- survfit(Surv(OS_time, censor) ~ GARP_binary, data=sub.meta_Proneural.GARP)
+ggsurvplot(km_trt_fit,pval = T)+ labs(title = "Proneural") 
+
+```
+
+
+# Effect of GARP expression on the phenotype of GBM
+In this analysis, we will compare GARP expression and GARP pathway activity among different GBM subtypes. The pathway activity is calculated by the GSVA algorithm.
+
+## TCGA_cell_2013 
+
+We calculate p-values for any two groups regarding GARP expression and GARP pathway activity. 
+
+* Classical vs Mesenchymal 
+* Classical vs Proneural
+* Classical vs Neural
+* Mesenchymal vs Proneural
+* Mesenchymal vs Neural
+* Proneural vs Neural
+
+###  GARP expression
+
+```{r, echo = F,warning=F}
+TCGA_cell_2013_meta_GARP <-TCGA_cell_2013_meta[,c("tutmor_type","GARP_expression")]
+TCGA_cell_2013_meta_GARP <- TCGA_cell_2013_meta_GARP[!is.na(TCGA_cell_2013_meta_GARP$GARP_expression),]
+my.comparison <- list(c("Classical","Mesenchymal"),
+                      c("Classical", "Proneural"),
+                      c("Classical","Neural"),
+                      c("Mesenchymal","Proneural"),
+                      c("Mesenchymal","Neural"),
+                      c("Neural","Proneural"))
+
+
+
+ggboxplot(TCGA_cell_2013_meta_GARP, x = "tutmor_type", y = "GARP_expression",
+          color = "tutmor_type", palette = "jco")+ 
+  stat_compare_means(comparisons = my.comparison)
+
+```
+
+### GARP pathway activity
+
+```{r, echo = F,warning=F}
+TCGA_cell_2013_meta_GARP <-TCGA_cell_2013_meta[,c("tutmor_type","GARP_geneset")]
+TCGA_cell_2013_meta_GARP <- TCGA_cell_2013_meta_GARP[!is.na(TCGA_cell_2013_meta_GARP$GARP_geneset),]
+my.comparison <- list(c("Classical","Mesenchymal"),
+                      c("Classical", "Proneural"),
+                      c("Classical","Neural"),
+                      c("Mesenchymal","Proneural"),
+                      c("Mesenchymal","Neural"),
+                      c("Neural","Proneural"))
+
+
+
+ggboxplot(TCGA_cell_2013_meta_GARP, x = "tutmor_type", y = "GARP_geneset",
+          color = "tutmor_type", palette = "jco")+ 
+  stat_compare_means(comparisons = my.comparison)
+
+```
+
